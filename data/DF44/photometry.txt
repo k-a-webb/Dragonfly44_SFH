@@ -1,0 +1,9 @@
+wfc3_uvis_f606w,19.80,0.08,ABmag
+wfc3_uvis_f814w,19.32,0.19,ABmag
+gmos_n_g_G0301,20.02,0.14,ABmag
+gmos_n_i_G0302,19.33,0.18,ABmag
+IRAC1,20.09,0.18,ABmag
+IRAC2,20.45,0.24,ABmag
+galex_NUV,23.67,0.35,ABmag
+uvot_w2,24.97,0.41,ABmag
+uvot_w1,23.40,0.19,ABmag
