@@ -5,7 +5,7 @@ This repository contains all the data used to analyze the star formation history
 Notebooks are provided to generate the figures shown in Webb+2022
 > notebooks/Webb20202_figures/*
 
-Note that some figures have slight errors, as noted in notebooks/Webb20202_figures/errata.txt. This errors have been corrected in the notebooks shared here.
+Note that some figures have slight errors, as noted in notebooks/Webb2022/errata.txt. This errors have been corrected in the notebooks shared here.
 
 In progress:
-- Notebooks where it is convenient to compare results beyond that shown in Webb+2022
+- Notebooks where it is convenient to compare results beyond that shown in Webb+2022. Some provided in notebooks/analysis/

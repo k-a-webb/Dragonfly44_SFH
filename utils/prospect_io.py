@@ -476,8 +476,11 @@ def get_models_from_posterior_draws( use_saved_draws, result, draws_quantiles=[0
     # get SED models for draws from the posteriors (saved in result['draws'])
     # calculate quantiles
 
+    if 'draws' not in result.keys():
+        return None
+
     # spectrum
-    if 'spectrum' in result['draws'].keys():
+    if ('spectrum' in result['draws'].keys()):
         draws['spec'] = np.copy( result['draws']['spectrum'] )
         draws['quantiles']['spec'] = np.quantile( draws['spec'], q=draws_quantiles, axis=0)
 

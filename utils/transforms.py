@@ -60,7 +60,7 @@ def chain_to_sfr( chain, theta_index, agebins=None, norm_by_mass=True,
     if "logsfr_ratios" in theta_index.keys():
         logsfr_ratios = chain_to_param( chain, theta_index, 'logsfr_ratios')
         if norm_by_mass: logmass = 0
-        elif mass is None: chain_to_param( chain, theta_index, 'logmass').T
+        elif mass is None: logmass = chain_to_param( chain, theta_index, 'logmass').T
         else: logmass = mass
         sfrs = logsfr_ratios_to_sfrs( logmass=logmass, logsfr_ratios=logsfr_ratios, agebins=agebins )
 

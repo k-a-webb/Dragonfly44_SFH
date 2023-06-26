@@ -63,9 +63,12 @@ def plot_photometry( ax, obs, bestfits, draws=None,
                         zorder=3, alpha=1, **bestfit_params)
         legend_items['bestfit']['phot'] = dict( handle=l, label='Bestfit photometry' )
 
-
-    ax.plot( bestfits['wave_sed'], bestfits['sed'],
-              color=bestfit_params['color'], lw=0.5, zorder=0 )
+    try:
+        ax.plot( bestfits['wave_sed'], bestfits['sed'],
+                  color=bestfit_params['color'], lw=0.5, zorder=0 )
+    except:
+        # sometimes the 'sed' entry is nonsense, requires post-processing step... not always done
+        pass
 
     # plot SED model draws from posterior, quantiles
     if plot_draws and (draws is not None):
@@ -105,7 +108,8 @@ def plot_photometry_residuals( ax, obs, bestfits,
 
     # plot residuals
     bestfit_params_dupe = deepcopy( bestfit_params )
-    bestfit_params_dupe['s'] = bestfit_params_dupe['s']/2.
+    if 's' in bestfit_params_dupe.keys():
+        bestfit_params_dupe['s'] = bestfit_params_dupe['s']/2.
     ax.scatter( x[mask], chi[mask],
                  edgecolor=bestfit_params_dupe['color'], facecolor='None', zorder=2,
                  alpha=1, **bestfit_params_dupe)
@@ -139,6 +143,8 @@ def plot_spectroscopy( ax, obs, bestfits, draws=None, plot_draws=True, zobs=0,
                      **extras ):
 
     if obs['spectrum'] is None: return ax, legend_items
+    if 'lw' not in bestfit_params.keys(): bestfit_params['lw'] = 1
+    if 'color' not in bestfit_params.keys(): bestfit_params['color'] = 'r'
 
     x, y, ey, mask = [ np.copy( obs[key] ) for key in [ "wavelength","spectrum","unc","mask" ]]
     x /= (1.+zobs) # observed-frame to rest-frame
@@ -285,7 +291,7 @@ def plot_obs_and_fits(result, obs, zobs,
              obs_params={'marker':'D', 'color':'c', 'ms':12},
              posts_params={'color':'goldenrod'},
              bestfit_params={'lw':2.4, 'color':'k', 'marker':'o', 's':160},
-             plot_legend=True, show_chi2s=True,
+             plot_legend=True, show_chi2s=True, label=None,
              **extras,
             ):
     """
@@ -318,10 +324,10 @@ def plot_obs_and_fits(result, obs, zobs,
     if True: # draws and bestfits, check if exist, make flags based on checks
         plot_draws = True
         if "draws" not in result.keys():
-            print("  draws not in file")
+            # print("  draws not in file")
             plot_draws = False
         elif "bestfit" not in result['draws'].keys():
-            print("  draws/bestfit not in file")
+            # print("  draws/bestfit not in file")
             plot_draws = False
 
         draws = get_models_from_posterior_draws( plot_draws, result, draws_quantiles, **extras )
@@ -337,9 +343,9 @@ def plot_obs_and_fits(result, obs, zobs,
         # else, figure MUST have six rows, and we now label each
         elif (obs['spectrum'] is not None) and (fig is not None):
             if axes is None:
-                ax_phot,ax_rphot,_,ax_spec,ax_rspec,ax_pspec,_ = fig.get_axes()
+                ax_phot,ax_rphot,_,ax_spec,ax_rspec,ax_pspec = fig.get_axes()[:6]
             else:
-                ax_phot,ax_rphot,_,ax_spec,ax_rspec,ax_pspec,_ = axes
+                ax_phot,ax_rphot,_,ax_spec,ax_rspec,ax_pspec = axes[:6]
         # if figure not already defined, and spectrum NOT included in fit, make figure with two rows
         elif (obs['spectrum'] is None) and (fig is None):
             if axes is None:
@@ -382,12 +388,13 @@ def plot_obs_and_fits(result, obs, zobs,
                                                    )
 
             # label chi2
+            label_chi2_phot = r"Bestfit $\chi^2$/N$_\mathrm{phot}$="+"{:.2f}".format( chi2_phot )
             if show_chi2s:
-                label_chi2_phot = r"Bestfit $\chi^2$/N$_\mathrm{phot}$="+"{:.2f}".format( chi2_phot )
                 ax_phot.annotate( label_chi2_phot, xytext=(0.01,0.97), **params_ann)
+            else: print( label, label_chi2_phot )
 
             ax_phot.set( xticklabels=[] )
-            ax_rphot.set_xlim(ax_phot.get_xlim())
+            ax_rphot.set_xlim( ax_phot.get_xlim())
 
         # if photometry NOT included in the observations, just plot bestfit
         else:
@@ -428,9 +435,10 @@ def plot_obs_and_fits(result, obs, zobs,
                                                    )
 
 
+            label_chi2_spec = r"Bestfit $\chi^2$/N$_\mathrm{spec}$="+"{:.2f}".format( chi2_spec )
             if show_chi2s: # label chi2
-                label_chi2_spec = r"Bestfit $\chi^2$/N$_\mathrm{phot}$="+"{:.2f}".format( chi2_phot )
-                ax_spec.annotate( label_chi2_phot, xytext=(0.01,0.97), **params_ann)
+                ax_spec.annotate( label_chi2_spec, xytext=(0.01,0.97), **params_ann)
+            else: print( label, label_chi2_spec )
 
             ax_spec.set( xticklabels=[] )
             ax_rspec.set( xticklabels=[] )
@@ -594,11 +602,21 @@ def compare_two_fits(plot_params1, plot_params2, draws_quantiles=[0.16,0.84], zo
         l4 = ax_legend.fill_between([],[], lw=0, color=plot_params1['bestfit_params']['color'], alpha=0.3)
         l5 = ax_legend.fill_between([],[], lw=0, color=plot_params2['bestfit_params']['color'], alpha=0.3)
 
-        ax_legend.legend( [(l1a,l1b),(l2a,l2b),(l3a,l3b),(l4,l5)],
-                          ['Observations',plot_params1['bestfit_params']['label'],plot_params2['bestfit_params']['label'],"68% CRs"],
-                          numpoints=1, loc=4,
+        handles = [(l1a,l1b),(l2a,l2b),(l3a,l3b),(l4,l5)]
+        labels = ['Observations','','',"68% CRs"]
+        for i,pp in enumerate( [plot_params1,plot_params2] ):
+            if ('label' in pp['bestfit_params'].keys()):
+                labels[i+1] = pp['bestfit_params']['label']
+            elif ('label' in pp.keys()):
+                labels[i+1] = pp['label']
+            else:
+                labels[i+1] = 'Bestfit {}'.format(i+1)
+
+
+        ax_legend.legend( handles, labels,
+                          numpoints=1, loc=4, markerscale=0.5, bbox_to_anchor=[0.8,0.02],
                           handler_map={tuple: HandlerTuple(ndivide=None)},
-                          markerscale=0.5, bbox_to_anchor=[0.8,0.02] )
+                           )
     return fig
 
 def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
@@ -639,7 +657,7 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
                      alpha=0.3, color=posts_params['color'], step='post', lw=0, zorder=1,
                      label=' '.join(["68% CRs of posterior",label]))
 
-    if show_priors:
+    if show_priors and (prior_draws is not None):
         if norm_by_mass: prior_key = 'ssfr'
         else: prior_key = 'sfr'
         qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=quantiles )
@@ -695,7 +713,7 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
     if style=='violin':
 
-        if show_priors:
+        if show_priors and (prior_draws is not None):
             parts = ax.violinplot( prior_draws['cmf'],
                                    positions=x,
                                    widths=vwidths*2,
@@ -744,7 +762,7 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
     elif style=='step':
 
-        if show_priors:
+        if show_priors and (prior_draws is not None):
             qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=[0.5]+quantiles )
                                     for x in prior_draws['cmf'].T ]).T
             ax.step( x, qs50, where='post', zorder=1, color=priors_params['edgecolor'], ls='--' )
@@ -770,7 +788,7 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
         ax.set_xticks( log_xticks )
         ax.set_xticklabels( xticks )
 
-        ax.set_xlim(-2, np.log10(cosmo.age(zobs).value) )
+        ax.set_xlim(-2, np.log10(xs[-1]) )
 
     ax.set_ylabel( r'Cumulative  $M_\ast/\mathrm{M}_\odot$' )
     ax.set_xlabel(r'Lookback time  (Gyr)' )

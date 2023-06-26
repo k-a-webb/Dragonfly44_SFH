@@ -39,7 +39,8 @@ def mask_spectroscopic_regions( wavelength, mask,
                                mask_feature_5170=False,
                                mask_feature_5230=False,
                                mask_feature_5270=False,
-                               mask_feature_5330=False):
+                               mask_feature_5330=False,
+                               **extras):
 
     # minimum and maxinimum wavelength range of spectrum to be included
     iwavemin = np.argmin(np.abs( wavelength - wave_range[0] ))
