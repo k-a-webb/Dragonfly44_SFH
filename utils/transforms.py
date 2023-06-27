@@ -172,13 +172,15 @@ def chain_to_Av( chain, theta_index, **extras ):
     if "dust_index" in theta_index.keys():
         dust_index = chain_to_param( chain, theta_index, 'dust_index')[:,0]
 
-    from utils.dust_transforms import get_attenuation_curve,tau_to_extinct
+    from .dust_transforms import get_attenuation_curve,tau_to_extinct
     tau = get_attenuation_curve( 5500., dust_ratio=dust_ratio,
                                        dust2=dust2,
                                        dust_index=dust_index,
                                 )
     extinct = tau_to_extinct( tau )
     return extinct[0]
+
+#################### the following are adapted Prospector scripts
 
 def sfr_to_mwa(agebins, sfrs, **extras):
     """
@@ -195,7 +197,6 @@ def sfr_to_mwa(agebins, sfrs, **extras):
         t_mws = np.sum( sfrs * mts * dts ) / np.sum(  sfrs * dts )
     return t_mws
 
-#################### the following are adapted Prospector scripts
 
 def logsfr_ratios_to_masses(logmass=0, logsfr_ratios=None, agebins=None, **extras):
     """This converts from an array of log_10(SFR_j / SFR_{j+1}) and a value of
@@ -286,64 +287,9 @@ def dust2_to_Av( dust2 ):
     print("Caution: This function does not work as intended for dust_type=4")
     return 2.5*np.log10(np.exp(1)) * dust2
 
-# Define fixed age bins
-def build_agebins( redshift, ncomp, tuniv=None, tlims_first=[0.03,0.1,0.5,1.], tlims_logspace=False, tbinmax=None, **extras ):
-    """
-    Define fixed age bins
-    redshift = 1.2 is the median redshift of the GOGREEN spectroscopic sample
-    Age bins are spaced:
-        0 < t < 30 Myr
-        30 < t < 100 Myr
-        100 < t < 500 Myr
-        500 Myr < t < 1 Gyr
-        ncomp-4 linearly spaced bins
-        0.95*t_universe < t < t_universe
-    """
-    from prospect.sources.constants import cosmo # import cosmology assumed when fitting
-    # if age of the Universe not provided, calculate based on redshift and cosmology
-    if tuniv is None: tuniv = cosmo.age(redshift).value
-    # if maximum time bin not provided, set based on 95\% of the age of the Universe
-    if tbinmax is None: tbinmax = (tuniv * 0.95)
-
-    # specify edges of the time bins
-    agelims = [1e-9] # close enough to zero
-    # starts with fixed time bins
-    agelims += tlims_first[:-1]
-    # can edit as necessary, currently specifies linearlly spaced time bins
-    if tlims_logspace:
-        agelims += np.logspace( np.log10(tlims_first[-1]), np.log10(tbinmax), nbins-len(tlims_first) ).tolist()
-    else:
-        agelims += np.linspace( tlims_first[-1], tbinmax, ncomp-len(tlims_first) ).tolist()
-    # last time bin covers tbinmax to tuniv
-    agelims += [tuniv]
-
-    # convert to units of log(t/yr)
-    agelims = np.log10( np.array(agelims) * 1e9)
-    # convert from list of bin edges to to array of bins
-    agebins = np.array([agelims[:-1], agelims[1:]])
-    agebins = agebins.T
-
-    # agebins_Gyr = np.power(10., agebins) *1e-9 # Gyr
-    return agebins
-
-def add_Av_to_chain( result ):
-    if 'Av' in result['theta_index'].keys(): return result
-
-    chain = result['chain']
-
-    # calculate mass-weighted age,
-    x = chain_to_Av( chain, result['theta_index'] )
-
-    # pay attention to dimension of the chain when adding new entry
-    if chain.ndim>2:
-        result['chain'] = np.dstack([ chain, x ])
-    else:
-        result['chain'] = np.vstack([ chain.T, x ]).T
-
-    N,M = np.shape( chain )
-    result['theta_index']['Av'] = slice( M, M+1 )
-
-    return result
+def logmass_mfrac_to_logmass_stellar( logmass_total=None, mfrac=None, **extras ):
+    logmass_stellar = logmass_total + np.log10( mfrac )
+    return logmass_stellar
 
 # def cumulate_masses( masses, **extras ):
 #     """ Cumulative sum of masses  """

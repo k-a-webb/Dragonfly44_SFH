@@ -36,7 +36,6 @@ def read_input(file_data=None, **extras):
 
     return ddict
 
-
 def read_results( result_file, more_groups=["draws"] , manual_agebins=None, **extras ):
     # import prospect.io.read_results as pread
     # from prospect_io import read_results
@@ -59,12 +58,26 @@ def read_results( result_file, more_groups=["draws"] , manual_agebins=None, **ex
         elif manual_agebins is not None:
             result['agebins'] = manual_agebins
 
-    result = check_theta_index( result )
+
+    from .prospect_postprocessing import add_missing_mass
     result = add_missing_mass( result, model )
-    result = add_mfrac_posteriors( result_file, result)
+
+    result = check_theta_index( result )
+
+    from .prospect_postprocessing import add_mwa_to_chain
+    result = add_mwa_to_chain( result )
+
+    from .prospect_postprocessing import add_Av_to_chain
+    result = add_Av_to_chain( result )
+
+    from .prospect_postprocessing import add_logmass_stellar_to_chain
+    result = add_logmass_stellar_to_chain( result )
+
+    if 'agebins' in result.keys():
+        from .prospect_postprocessing import add_sfr_quantiles_to_chain
+        result = add_sfr_quantiles_to_chain( result, ctimescales=[0.5,0.9] )
 
     return result, result['obs'], model
-
 
 def get_res( result_file, pickle=False, more_groups=[], manual_theta_labels=None, \
              verbose=False, start_index=0, thin=1, run_params_edit={}, **extras):
@@ -231,169 +244,16 @@ def check_theta_index( result):
             i1 = v[-1]
             result['theta_index'][th] = slice( i0, i1+1 )
 
-    thidx = result['theta_index']
-    thidx_keys = thidx.keys()
-
-    # check if log mass entry exists
-    if 'logmass' not in thidx_keys:
-
-        # if using mass-metallicity prior, copy entry with name "logmass"
-        if 'massmet' in thidx_keys:
-            idx_logmass = thidx['massmet'][0]
-            result['theta_index']['logmass'] = slice( idx_logmass, idx_logmass+1 )
-            result['theta_index']['massmet_1'] = slice( idx_logmass, idx_logmass+1 )
-
-        # if using mass-metallicity prior, copy entry with name "logmass"
-        elif 'massmet_1' in thidx_keys:
-            result['theta_index']['logmass'] = thidx['massmet_1']
-
-        # if total_mass exists, calculated log-mass and make new entry
-        elif ('total_mass' in thidx_keys) or ('mass' in thidx_keys):
-            if ('total_mass' in thidx_keys): mass_key = 'total_mass'
-            elif ('mass' in thidx_keys): mass_key = 'mass'
-
-            chain = result['chain'] # copy chain
-            npar = np.shape(chain)[-1] # get shape of chain
-            #  add new entry to chain, pay attention to the dimension of the chain
-            # (MCMC derived chains different dimention than nested sampling derived chain)
-            m = transforms.chain_to_param( chain, result['theta_index'], mass_key )
-            x = np.log10( m )
-            if chain.ndim>2:
-                result['chain'] = np.dstack([ chain, x ])
-            else:
-                result['chain'] = np.hstack([ chain, x ])
-
-            # add entry to theta_index dictionary
-            idx_logmass = npar # new entry last index
-            result['theta_index']['logmass'] = slice( idx_logmass, idx_logmass+1 )
-
-            # also copy bestfit values
-            theta_map = result['bestfit']['parameter']
-            x = np.log10( theta_map[ result['theta_index'][mass_key] ])
-            result['bestfit']['parameter'] = np.append( theta_map, x )
-
-        else: print('Caution: No logmass or massmet/massmet_1 or total_mass parameter!')
-
-    # follow same logic to add metallicity information
-    if 'logzsol' not in thidx_keys:
-        if 'massmet' in thidx_keys:
-            idx_logzsol = thidx['massmet'][1]
-            result['theta_index']['logzsol'] = slice( idx_logzsol, idx_logzsol+1 )
-            result['theta_index']['massmet_2'] = slice( idx_logzsol, idx_logzsol+1 )
-        elif 'massmet_2' in thidx_keys:
-            result['theta_index']['logzsol'] = thidx['massmet_2']
-        else:
-            print('Caution: No logzsol or massmet parameter!')
-
-    # follow same logic to add mass-weighted age information
-    if 'mwa' not in thidx_keys:
-
-        chain = result['chain']
-
-        # calculate mass-weighted age,
-        x = transforms.chain_to_mwa( chain, result['theta_index'], result['agebins'] ).T
-        # pay attention to dimension of the chain when adding new entry
-        if chain.ndim>2:
-            result['chain'] = np.dstack([ chain, x ])
-        else:
-            result['chain'] = np.vstack([ chain.T, x ]).T
-
-        N,M = np.shape( chain )
-        idx_mwa = M
-        result['theta_index']['mwa'] = slice( idx_mwa, idx_mwa+1 )
-        result['theta_index']['MWA'] = slice( idx_mwa, idx_mwa+1 ) # for backwards compatability
-
-    return result
-
-def add_missing_mass( result, model, **extras ):
-    thidx_keys = result['theta_index']
-
-    if ('total_mass' not in thidx_keys) and ('logmass' not in thidx_keys):
-        if model is None:
-            print("Warning: Mass is missing, but model is None, can't fill... ")
-            return result
-
-        chain = result['chain']
-
-        if 'total_mass' in model.params:
-            total_mass = np.full( chain.shape[:-1], model.params['total_mass'] )
-            logmass = np.log10( total_mass )
-        elif 'logmass' in model.params:
-            logmass = np.full( chain.shape[:-1], model.params['logmass'] )
-            total_mass =10**logmass
-        elif 'mass' in model.params:
-            total_mass = model.params['mass'].sum()
-            total_mass = np.full( chain.shape[:-1], total_mass )
-            logmass = np.log10( total_mass )
-
-        total_mass = np.squeeze(total_mass)
-        logmass = np.squeeze(logmass)
-
-        npar = np.shape(chain)[-1]
-        result['chain'] = np.vstack([ chain.T, total_mass ]).T
-        result['chain'] = np.vstack([ result['chain'].T, logmass ]).T
-
-        result['theta_index']['total_mass'] = slice( npar, npar+1 )
-        result['theta_index']['logmass'] = slice( npar+1, npar+2 )
-
-    return result
-
-
-def add_mfrac_posteriors( result_file, result):
-    import h5py
-
-    if 'logmass_stellar' in result['theta_index'].keys():
-        return result
-    if ('logmass' not in result['theta_index'].keys()) and ('mass' not in result['theta_index'].keys()):
-        print("Warning: No logmass to convert ...")
-        return result
-
-    chain = result['chain']
-    _,ndim = np.shape(chain)
-
-    draws_full = False
-    with h5py.File( result_file, 'r' ) as hfile:
-        if "draws_full" not in hfile.keys():
-            if "draws" not in hfile.keys():
-                print("Warning: 'draws_full' and 'draws' not in file, not calculating stellar mass")
-                return result
-            else:
-                if "mfrac" not in hfile['draws'].keys():
-                    print("Warning: 'mfrac' not in draws in file, not calculating stellar mass")
-                    return result
-                else:
-                    mfracs = np.array( hfile['draws']['mfrac'] )
-        else:
-            draws_full = True
-            mfracs = np.array( hfile['draws_full']['mfrac'] )
-
+    # check if log mass entry exists, add otherwise
     if 'logmass' not in result['theta_index'].keys():
-        if 'mass' in result['theta_index'].keys():
-            mass = chain[ :, result['theta_index']['mass'] ][:,0]
-            logmass = np.log10( mass )
-        else:
-            print("Error: No mass or logmass? ")
-    else:
-        logmass = chain[ ..., result['theta_index']['logmass'] ][:,0]
+        from .prospect_postprocessing import add_logmass_to_chain
+        result = add_logmass_to_chain( result )
 
-    if draws_full:
-        chain = np.vstack([ chain.T, mfracs ]).T
-        result['theta_index']['mfrac'] = slice( ndim, ndim+1 )
-        logmass_stellar = logmass + np.log10( mfracs )
-        _,ndim = np.shape(chain)
+    if 'logzsol' not in result['theta_index'].keys():
+        from .prospect_postprocessing import add_logzsol_to_chain
+        result = add_logzsol_to_chain( result )
 
-    else:
-        m_mfrac = np.median( mfracs )
-        logmass_stellar = logmass + np.log10( m_mfrac )
 
-        # qs_mfrac = np.quantile( np.log10(mfracs), q=[0.16,0.5,0.84] )
-        # dqs_mfrac = np.diff(qs_mfrac)
-        # print("log10(mfrac) = {:.3f},   {:.3f} -{:.3f} +{:.3f}".format(np.log10( m_mfrac ), qs_mfrac[1], *dqs_mfrac ))
-
-    chain = np.vstack([ chain.T, logmass_stellar ]).T
-    result['theta_index']['logmass_stellar'] = slice( ndim, ndim+1 )
-
-    result['chain'] = chain
     return result
 
 def get_model(result, file_data=None, file_data_path=None, param_file_path=None, **extras ):

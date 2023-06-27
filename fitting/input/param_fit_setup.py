@@ -139,6 +139,12 @@ def build_obs( data_dict=None,
 # SPS Object
 # --------------
 
+def build_sps( sfh, zcontinuous=1, compute_vega_mags=False, **extras):
+    if sfh == 3:
+        return build_sps_nonparametric( zcontinuous, compute_vega_mags, **extras )
+    else:
+        raise Exception
+
 def build_sps_nonparametric(zcontinuous=1, compute_vega_mags=False, **extras):
     from prospect.sources import FastStepBasis
     sps = FastStepBasis(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_mags)
@@ -169,8 +175,8 @@ def build_gp(**extras):
 # --------------
 # MODEL_PARAMS
 # --------------
-
-def build_agebins( redshift, nbins, **extras ):
+# Define fixed age bins
+def build_agebins( redshift, nbins, tuniv=None, tlims_first=[1e-9,0.03,0.1,0.5,1.], tlims_logspace=False, tbinmax=None, **extras ):
     """
     Define fixed age bins
     redshift = 1.2 is the median redshift of the GOGREEN spectroscopic sample
@@ -182,24 +188,31 @@ def build_agebins( redshift, nbins, **extras ):
         nbins-4 linearly spaced bins
         0.95*t_universe < t < t_universe
     """
-    from prospect.sources.constants import cosmo
-    import astropy.units as u
-    tuniv = cosmo.age(redshift).value
+    from prospect.sources.constants import cosmo # import cosmology assumed when fitting
+    # if age of the Universe not provided, calculate based on redshift and cosmology
+    if tuniv is None: tuniv = cosmo.age(redshift).value
+    # if maximum time bin not provided, set based on 95\% of the age of the Universe
+    if tbinmax is None: tbinmax = (tuniv * 0.95)
 
-    # specify boundaries of time bins
-    tbinmax = (tuniv * 0.95)
-    #lim1, lim2, lim3, lim4 = 0.03, 0.1, 0.5, 1.
-    #agelims = [1e-9,lim1,lim2,lim3] + np.linspace(lim4,tbinmax,nbins-4).tolist() + [tuniv]
-    lims = [0.03, 0.1, 0.5, 1., 2., 3]
-    agelims = [1e-9] + lims[:-1] + np.logspace( np.log10(lims[-1]), np.log10(tbinmax), nbins-len(lims) ).tolist() + [tuniv]
+    # specify edges of the time bins
+    # starts with fixed time bins
+    agelims = tlims_first[:-1]
+    # can edit as necessary, currently specifies linearlly spaced time bins
+    if tlims_logspace:
+        agelims += np.logspace( np.log10(tlims_first[-1]), np.log10(tbinmax), nbins-len(tlims_first)+1 ).tolist()
+    else:
+        agelims += np.linspace( tlims_first[-1], tbinmax, nbins-len(tlims_first)+1 ).tolist()
+    # last time bin covers tbinmax to tuniv
+    agelims += [tuniv]
 
+    # convert to units of log(t/yr)
     agelims = np.log10( np.array(agelims) * 1e9)
+    # convert from list of bin edges to to array of bins
     agebins = np.array([agelims[:-1], agelims[1:]])
     agebins = agebins.T
 
-    #agebins_Gyr = np.power(10., agebins) *1e-9 # Gyr
+    # agebins_Gyr = np.power(10., agebins) *1e-9 # Gyr
     return agebins
-
 
 def build_model_dirichlet( model_params, nbins, zred,
                            alphaD=1,
@@ -207,7 +220,10 @@ def build_model_dirichlet( model_params, nbins, zred,
     """
     Add Dirichlet prior parameters
     """
-    from prospect.models import priors, sedmodel, transforms
+    from prospect.models import priors
+    from prospect.models.templates import TemplateLibrary
+
+    model_params.update( TemplateLibrary["dirichlet_sfh"] )
 
     model_params["total_mass"] = {"N": 1,
                                    "init": 10**(8.48),
@@ -237,7 +253,10 @@ def build_model_continuity( model_params, nbins, zred, tlims_first=None, tlims_l
     """
     Add continuity prior parameters
     """
-    from prospect.models import priors, sedmodel, transforms
+    from prospect.models import priors
+    from prospect.models.templates import TemplateLibrary
+
+    model_params.update( TemplateLibrary["continuity_sfh"] )
 
     model_params["logmass"] = {"N": 1,
                                "init": 8.48,
@@ -265,12 +284,45 @@ def build_model_continuity( model_params, nbins, zred, tlims_first=None, tlims_l
 
     return model_params
 
+def build_model_UMtuned_continuity( model_params, nbins, zred, tlims_first=None, tlims_logspace=False,
+                                    **extras ):
+    """
+    Add continuity prior parameters
+    """
+    from prospect.models import priors, transforms
+    from prospect.models.templates import TemplateLibrary
+
+    model_params.update( TemplateLibrary["beta"] )
+
+    model_params['nzsfh'] = {'N': nbins+2,
+                             'isfree': True,
+                             'init': np.concatenate([[0.5,8,0.0], np.zeros(nbins-1)]),
+                             'prior': priors_beta.NzSFH(zred_mini=1e-3, zred_maxi=15.0,
+                                                    mass_mini=7.0, mass_maxi=12.5,
+                                                    z_mini=-1.98, z_maxi=0.19,
+                                                    logsfr_ratio_mini=-5.0, logsfr_ratio_maxi=5.0,
+                                                    logsfr_ratio_tscale=0.3, nbins_sfh=nbins,
+                                                    const_phi=True)}
+
+    model_params["logmass"]["init"] = 8.48
+    model_params["zred"]["init"] = zred
+
+    model_params["logsfr_ratios"]["N"] = nbins-1
+    model_params['mass']['N'] = nbins
+
+    model_params['agebins']['N'] = nbins
+    model_params['agebins']['init'] = transforms.zred_to_agebins_pbeta(np.atleast_1d(0.5), np.zeros(nbins))
+
+
+    return model_params
+
+
 def build_model_dust( model_params, dust_type=4, **extras ):
     """
     Add dust model parameters
     refer to FSPS manual for details
     """
-    from prospect.models import priors, sedmodel, transforms
+    from prospect.models import priors, transforms
 
     # dust_type = 4 # Kriek
     # dust_type = 1 # MW like  # mwr = 3.1 by default, uvb = 1. by default
@@ -309,7 +361,7 @@ def build_model_dust( model_params, dust_type=4, **extras ):
 
 
 def build_model( data_dict=None, sfh=3,
-                 alphaD=None, stdT_mean=None,
+                 alphaD=None, stdT_mean=None, spec_norm=1,
                  fit_duste=False, fit_agn=False, fit_neb=False, nbins=10, dust_type=4, **extras):
     """Construct a model.  This method defines a number of parameter
     specification dictionaries and uses them to initialize a
@@ -382,6 +434,7 @@ def build_model( data_dict=None, sfh=3,
         model_params.update(TemplateLibrary["optimize_speccal"])
 
         npoly = extras["npoly"]
+        model_params["spec_norm"]["N"] = spec_norm
         model_params["polyorder"]["init"] = npoly
         if "poly_regularization" in extras.keys():
             model_params["poly_regularization"]["init"] = extras['poly_regularization']
@@ -426,7 +479,7 @@ def build_model( data_dict=None, sfh=3,
             from Dragonfly44_SFH.fitting.prospect.models.sedmodel import PolySpecModel_dirichlet
             model = PolySpecModel_dirichlet(model_params)
         else:
-            model = sedmodel.PolySpecModelpo(model_params)
+            model = sedmodel.PolySpecModel(model_params)
     elif extras["fit_polynomial"]:
         print("Error: Fitting coefficient of spec calibration not implemented")
         sys.exit()
