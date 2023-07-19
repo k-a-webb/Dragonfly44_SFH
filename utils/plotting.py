@@ -620,6 +620,7 @@ def compare_two_fits(plot_params1, plot_params2, draws_quantiles=[0.16,0.84], zo
     return fig
 
 def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
+             sfh=3, times=None, sfrs_post=None, thin=10,
              posts_params={'color':'c', 'lw':1.5},
              label='',
              priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
@@ -631,43 +632,88 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
     from Dragonfly44_SFH.utils.misc_utils import weighted_quantile
     from Dragonfly44_SFH.utils.transforms import chain_to_sfr
 
-    agebins = np.copy( result['agebins'] )
-    agebins_Gyr = np.power(10, agebins-9)
-    ncomp = np.shape( agebins )[0]
+    if sfh==3:
+        agebins = np.copy( result['agebins'] )
+        agebins_Gyr = np.power(10, agebins-9)
+        ncomp = np.shape( agebins )[0]
 
-    x = np.unique( agebins_Gyr )
-    mx = x[:-1]+np.diff(x)/2. # midpoint of bins
+        x = np.unique( agebins_Gyr )
+        mx = x[:-1]+np.diff(x)/2. # midpoint of bins
 
-    sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, **result )
+        sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, **result )
 
-    ibest = np.argmax( result["lnprobability"] )
-    sfrs_best = sfrs_post[ibest,:]
+        if show_bestfit:
+            ibest = np.argmax( result["lnprobability"] )
+            sfrs_best = sfrs_post[ibest,:]
+            ax.scatter( mx, sfrs_best,
+                        zorder=3, label=' '.join(["Bestfit",label]), **bestfit_params)
 
-    if show_bestfit:
-        ax.scatter( mx, sfrs_best,
-                    zorder=3, label=' '.join(["Bestfit",label]), **bestfit_params)
-
-    quantiles = [0.5]+quantiles
-    w = result['weights']
-    qs50, qs_1, qs_2 = np.array([ weighted_quantile( x, quantiles, w )
-                            for x in sfrs_post.T ]).T
-    ax.step( x, np.append( qs50, qs50[-1] ),
-             where='post', zorder=2, label=' '.join(["Posterior median",label]), **posts_params)
-    ax.fill_between( x, np.append( qs_1, qs_1[-1] ), np.append( qs_2, qs_2[-1] ),
-                     alpha=0.3, color=posts_params['color'], step='post', lw=0, zorder=1,
-                     label=' '.join(["68% CRs of posterior",label]))
-
-    if show_priors and (prior_draws is not None):
-        if norm_by_mass: prior_key = 'ssfr'
-        else: prior_key = 'sfr'
-        qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=quantiles )
-                                for x in prior_draws[prior_key].T ]).T
-        ax.step( x, np.append(qs50, qs50[-1]),
-                 where='post', zorder=1, color=priors_params['edgecolor'], ls='--',
-                 label=' '.join(['Prior median',label]) )
+        quantiles = [0.5]+quantiles
+        w = result['weights']
+        qs50, qs_1, qs_2 = np.array([ weighted_quantile( x, quantiles, w )
+                                for x in sfrs_post.T ]).T
+        ax.step( x, np.append( qs50, qs50[-1] ),
+                 where='post', zorder=2, label=' '.join(["Posterior median",label]), **posts_params)
         ax.fill_between( x, np.append( qs_1, qs_1[-1] ), np.append( qs_2, qs_2[-1] ),
-                         step='post', zorder=1,
-                         label=' '.join(['68% CRs of prior',label]), **priors_params)
+                         alpha=0.3, color=posts_params['color'], step='post', lw=0, zorder=1,
+                         label=' '.join(["68% CRs of posterior",label]))
+
+        if show_priors and (prior_draws is not None):
+            if norm_by_mass: prior_key = 'ssfr'
+            else: prior_key = 'sfr'
+            qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=quantiles )
+                                    for x in prior_draws[prior_key].T ]).T
+            ax.step( x, np.append(qs50, qs50[-1]),
+                     where='post', zorder=1, color=priors_params['edgecolor'], ls='--',
+                     label=' '.join(['Prior median',label]) )
+            ax.fill_between( x, np.append( qs_1, qs_1[-1] ), np.append( qs_2, qs_2[-1] ),
+                             step='post', zorder=1,
+                             label=' '.join(['68% CRs of prior',label]), **priors_params)
+    else:
+        assert times is not None, "Error: must provide time vector to plot SFR for sfh {}".format(sfh)
+        x = times
+
+        if sfrs_post is None:
+            from prospect.plotting.sfh import params_to_sfh
+            from Dragonfly44_SFH.utils.transforms import chain_to_param
+
+            masses = chain_to_param( param='mass', **result)[:,0]
+            if norm_by_mass: masses = np.ones_like(masses)
+            _, sfrs_post, _ = params_to_sfh( dict( tau=chain_to_param( param='tau', **result)[:,0],
+                                                 tage=chain_to_param( param='tage', **result)[:,0],
+                                                 sfh=sfh,
+                                                 mass=masses,
+                                               ),
+                                            time=times )
+
+
+        if show_bestfit:
+            ibest = np.argmax( result["lnprobability"] )
+            sfrs_best = sfrs_post[ibest,:]
+            ax.scatter( x[::thin], sfrs_best[::thin],
+                        zorder=3, label=' '.join(["Bestfit",label]), **bestfit_params)
+
+        quantiles = [0.5]+quantiles
+        w = result['weights']
+        qs50, qs_1, qs_2 = np.array([ weighted_quantile( x, quantiles, w )
+                                for x in sfrs_post.T ]).T
+        ax.step( x, qs50,
+                 where='post', zorder=2, label=' '.join(["Posterior median",label]), **posts_params)
+        ax.fill_between( x, qs_1, qs_2,
+                         alpha=0.3, color=posts_params['color'], step='post', lw=0, zorder=1,
+                         label=' '.join(["68% CRs of posterior",label]))
+
+        if show_priors and (prior_draws is not None):
+            if norm_by_mass: prior_key = 'ssfr'
+            else: prior_key = 'sfr'
+            qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=quantiles )
+                                    for x in prior_draws[prior_key].T ]).T
+            ax.step( x, qs50,
+                     where='post', zorder=1, color=priors_params['edgecolor'], ls='--',
+                     label=' '.join(['Prior median',label]) )
+            ax.fill_between( x, qs_1, qs_2,
+                             step='post', zorder=1,
+                             label=' '.join(['68% CRs of prior',label]), **priors_params)
 
     ax.set(xlim=[-0.1,x[-1]+0.1], yscale='log')
     if norm_by_mass: ylabel = r'sSFR  (yr$^{-1}$)'
@@ -677,15 +723,95 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
     return ax
 
-def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
-             style='violin',
-             posts_params={'color':'c', 'lw':0},
-             priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
-             bestfit_params={'marker':'X', 'edgecolor':'k', 'facecolor':'None', 's':80, 'lw':0.9},
-             quantiles=[0.16,0.84],
-             xscale='log', vwidths=0.2,
-             **extras,
-            ):
+
+
+def plot_cmf( sfh=3, **extras ):
+    if sfh==3:
+        ax = plot_cmf_nonparametric( **extras )
+    elif sfh in [1,4]:
+        ax = plot_cmf_parametric( **extras )
+    return ax
+
+def plot_cmf_parametric(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
+                         sfh=4, times=None, cmfs_post=None, thin=10,
+                         posts_params={'color':'c', 'lw':0},
+                         priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
+                         bestfit_params={'marker':'X', 'edgecolor':'k', 'facecolor':'None', 's':80, 'lw':0.9},
+                         quantiles=[0.16,0.84],
+                         xscale='log', vwidths=0.2,
+                         **extras,
+                        ):
+    assert times is not None, "Error: must provide time vector to plot SFR for sfh {}".format(sfh)
+
+    if cmfs_post is None:
+        from prospect.plotting.sfh import params_to_sfh
+        from Dragonfly44_SFH.utils.transforms import chain_to_param
+        from prospect.plotting.sfh import sfh_to_cmf
+
+        masses = chain_to_param( param='mass', **result)[:,0]
+        _, sfrs_post, cmfs_post = params_to_sfh( dict( tau=chain_to_param( param='tau', **result)[:,0],
+                                             tage=chain_to_param( param='tage', **result)[:,0],
+                                             sfh=sfh,
+                                             mass=masses,
+                                           ),
+                                        time=times )
+
+        times_like_agebins = np.log10(times*1e9)
+        times_like_agebins[0] = 1e-9
+        times_like_agebins = np.array([ times_like_agebins[:-1], times_like_agebins[1:] ]).T
+        x, cmfs_post = sfh_to_cmf( sfrs_post[:,:-1], times_like_agebins )
+
+    if xscale=='log': x = np.log10(x)
+
+    # reweight, if weights exist (i.e., used nested sampling)
+    if 'weights' in result.keys():
+        from dynesty.utils import resample_equal
+        cmfs_post = resample_equal( cmfs_post, result['weights'])
+
+
+    if show_priors and (prior_draws is not None):
+        qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=[0.5]+quantiles )
+                                for x in prior_draws['cmf'].T ]).T
+        ax.step( x, qs50, where='post', zorder=1, color=priors_params['edgecolor'], ls='--' )
+        ax.fill_between( x, qs_1, qs_2,
+                         step='post', zorder=1, **priors_params)
+
+
+    qs50, qs_1, qs_2 = np.array([ np.quantile( x, q=[0.5]+quantiles )
+                                for x in cmfs_post.T ]).T
+    ax.step( x, qs50, where='post', zorder=1, color=posts_params['color'], ls='-' )
+    ax.fill_between( x, qs_1, qs_2,
+                     alpha=0.3, step='post', zorder=1, **posts_params)
+
+    if show_bestfit:
+        ibest = np.argmax( result["lnprobability"] )
+        cmfs_best = cmfs_post[ibest,:]
+        ax.scatter( x[::thin], cmfs_best[::thin],
+                    zorder=3, **bestfit_params)
+
+
+    if xscale=='log':
+        xticks = ([0.1,0.5,1,2,3,5,8,13])
+        log_xticks = np.log10(xticks)
+        ax.set_xticks( log_xticks )
+        ax.set_xticklabels( xticks )
+
+        ax.set_xlim(-2, np.log10(xs[-1]) )
+
+    ax.set_ylabel( r'Cumulative  $M_\ast/\mathrm{M}_\odot$' )
+    ax.set_xlabel(r'Lookback time  (Gyr)' )
+
+    return ax
+
+def plot_cmf_nonparametric(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
+                             style='violin',
+                             posts_params={'color':'c', 'lw':0},
+                             priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
+                             bestfit_params={'marker':'X', 'edgecolor':'k', 'facecolor':'None', 's':80, 'lw':0.9},
+                             quantiles=[0.16,0.84],
+                             xscale='log', vwidths=0.2,
+                             **extras,
+                            ):
 
     assert style in ['violin','step'], "Error: style must be one of: violin, step"
 
@@ -702,9 +828,6 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
     x, cmfs_post = sfh_to_cmf( sfrs_post, agebins )
     if xscale=='log': x = np.log10(x)
 
-    # best bestfit solution
-    ibest = np.argmax( result["lnprobability"] )
-    cmfs_best = cmfs_post[ibest,:]
 
     # reweight, if weights exist (i.e., used nested sampling)
     if 'weights' in result.keys():
@@ -756,6 +879,8 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
         ax.plot( x, q50, color=posts_params['color'], alpha=0.2, zorder=0, lw=4 )
 
         if show_bestfit:
+            ibest = np.argmax( result["lnprobability"] )
+            cmfs_best = cmfs_post[ibest,:]
             ax.scatter( x, cmfs_best,
                         zorder=3, **bestfit_params)
 
@@ -777,6 +902,8 @@ def plot_cmf(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
                          alpha=0.3, step='post', zorder=1, **posts_params)
 
         if show_bestfit:
+            ibest = np.argmax( result["lnprobability"] )
+            cmfs_best = cmfs_post[ibest,:]
             mx = np.median( agebins_Gyr , axis=1 )
             ax.scatter( mx, cmfs_best[:-1],
                         zorder=3, **bestfit_params)

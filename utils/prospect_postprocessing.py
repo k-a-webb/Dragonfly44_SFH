@@ -233,15 +233,19 @@ def add_to_bestfit( result, x, label ):
 def add_Av_to_chain( result ):
 
     from .transforms import chain_to_Av
-    x = chain_to_Av( **result )
+    try:
+        x = chain_to_Av( **result )
+    except Exception as e:
+        print(e)
+        x = np.full_like( result['chain'][...,0], np.nan )
     result = add_to_chain( result, x, 'Av' )
 
     return result
 
-def add_mwa_to_chain( result ):
+def add_mwa_to_chain( result, sfh=None ):
 
     from .transforms import chain_to_mwa
-    x = chain_to_mwa( **result )
+    x = chain_to_mwa( sfh=sfh, **result )
     result = add_to_chain( result, x, 'mwa', label2='MWA' )
 
     return result
@@ -269,7 +273,6 @@ def add_logmass_to_chain( result ):
         result = add_to_chain( result, x, 'logmass' )
 
     elif ('mass' in theta_index_keys):
-
         from .transforms import chain_to_param
         x = chain_to_param( result['chain'], result['theta_index'], 'mass' )
         x = np.log10( x )
@@ -300,15 +303,15 @@ def add_logzsol_to_chain( result ):
 
 def add_missing_mass( result, model, **extras ):
     thidx_keys = result['theta_index']
+    chain = result['chain']
 
-    if ('total_mass' not in thidx_keys) and ('logmass' not in thidx_keys):
+    if ('total_mass' not in thidx_keys) and ('logmass' not in thidx_keys) and ('mass' not in thidx_keys):
+
         if model is None:
             print("Warning: Mass is missing, but model is None, can't fill... ")
             return result
 
-        chain = result['chain']
-
-        if 'total_mass' in model.params:
+        elif 'total_mass' in model.params:
             total_mass = np.full( chain.shape[:-1], model.params['total_mass'] )
             logmass = np.log10( total_mass )
         elif 'logmass' in model.params:

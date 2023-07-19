@@ -36,7 +36,7 @@ def read_input(file_data=None, **extras):
 
     return ddict
 
-def read_results( result_file, more_groups=["draws"] , manual_agebins=None, **extras ):
+def read_results( result_file, more_groups=["draws"] , manual_agebins=None, sfh=None, **extras ):
     # import prospect.io.read_results as pread
     # from prospect_io import read_results
 
@@ -46,6 +46,10 @@ def read_results( result_file, more_groups=["draws"] , manual_agebins=None, **ex
     except Exception as e:
         print(e)
         model = None
+
+    if sfh is None:
+        if model is not None:
+            sfh = int( model.params['sfh'] )
 
     if "agebins" not in result.keys():
         if (model is not None) and (manual_agebins is None):
@@ -65,7 +69,7 @@ def read_results( result_file, more_groups=["draws"] , manual_agebins=None, **ex
     result = check_theta_index( result )
 
     from .prospect_postprocessing import add_mwa_to_chain
-    result = add_mwa_to_chain( result )
+    result = add_mwa_to_chain( result, sfh=sfh )
 
     from .prospect_postprocessing import add_Av_to_chain
     result = add_Av_to_chain( result )
