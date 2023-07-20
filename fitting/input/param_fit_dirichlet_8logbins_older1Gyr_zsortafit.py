@@ -6,7 +6,7 @@ from prospect import prospect_args
 from prospect.fitting import fit_model
 from prospect.io import write_results as writer
 
-from Dragonfly44_SFH.fitting.input.param_fit_setup import *
+from Dragonfly44_SFH.fitting.input.param_fit_setup_zsortafit import *
 
 # --------------
 # RUN_PARAMS
@@ -18,8 +18,8 @@ default_run_params = {
               'sfh': 3,
               'alphaD': 1,
 
-              'nbins': 12,
-              'tlims_first': [1e-9, 0.03, 0.1, 0.5, 1., 2., 3],
+              'nbins': 8,
+              'tlims_first': [1., 2., 3],
               'tlims_logspace': True,
 
               'file_data': path_data+"Dragonfly44/obs_phot_specKCWI_sigma110.h5",
@@ -86,7 +86,6 @@ if __name__=='__main__':
     parser.add_argument('--fit_spectra', type=int, default=default_run_params['fit_spectra'], help='Whether to fit spectra or not')
     parser.add_argument('--fit_phot', type=int, default=default_run_params['fit_phot'], help='Whether to fit photometry or not')
     parser.add_argument('--fit_sigma', type=int, default=default_run_params['fit_sigma'], help='Whether to fit smoothing parameter')
-    parser.add_argument('--fit_redshift', type=int, default=default_run_params['fit_redshift'], help='Whether to fit redshift')
     parser.add_argument('--fit_mass', type=int, default=default_run_params['fit_mass'], help='Whether to stellar mass')
 
     parser.add_argument('--wave_range', type=int, nargs="*", default=[0,10000])
@@ -122,7 +121,7 @@ if __name__=='__main__':
 
     obs = build_obs( **run_params )
     model = build_model( **run_params )
-    sps = build_sps(**run_params)
+    sps = build_sps_nonparametric(**run_params)
     noise = build_noise(**run_params)
 
     model_param_text = 'Model params\n'

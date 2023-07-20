@@ -6,7 +6,7 @@ from prospect import prospect_args
 from prospect.fitting import fit_model
 from prospect.io import write_results as writer
 
-from Dragonfly44_SFH.fitting.input.param_fit_setup import *
+from Dragonfly44_SFH.fitting.input.param_fit_setup_zsortafit import *
 
 # --------------
 # RUN_PARAMS
@@ -86,7 +86,6 @@ if __name__=='__main__':
     parser.add_argument('--fit_spectra', type=int, default=default_run_params['fit_spectra'], help='Whether to fit spectra or not')
     parser.add_argument('--fit_phot', type=int, default=default_run_params['fit_phot'], help='Whether to fit photometry or not')
     parser.add_argument('--fit_sigma', type=int, default=default_run_params['fit_sigma'], help='Whether to fit smoothing parameter')
-    parser.add_argument('--fit_redshift', type=int, default=default_run_params['fit_redshift'], help='Whether to fit redshift')
     parser.add_argument('--fit_mass', type=int, default=default_run_params['fit_mass'], help='Whether to stellar mass')
 
     parser.add_argument('--wave_range', type=int, nargs="*", default=[0,10000])

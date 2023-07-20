@@ -6,15 +6,14 @@ from prospect import prospect_args
 from prospect.fitting import fit_model
 from prospect.io import write_results as writer
 from prospect.io import read_results as pread
-from prospect.sources.constants import cosmo
+from Dragonfly44_SFH.fitting.prospect.sources.constants import cosmo
 
 from Dragonfly44_SFH.utils import obs_io
 
 import os
-path_base = os.getcwd().split('Dragonfly44_SFH')[0] # gross, but works
-path_fits = path_base+ "Dragonfly44_SFH/fitting/output/fits/"
-path_data = path_base+ "Dragonfly44_SFH/data/"
-
+path_base = os.getcwd().split('Dragonfly44_SFH')[0] + "Dragonfly44_SFH/" # hack, but works
+path_fits = path_base+ "fitting/output/fits/"
+path_data = path_base+ "data/"
 
 # OBS
 # -------------
@@ -100,6 +99,8 @@ def build_obs( data_dict=None,
 def build_sps( sfh, zcontinuous=1, compute_vega_mags=False, **extras):
     if sfh == 3:
         return build_sps_nonparametric( zcontinuous, compute_vega_mags, **extras )
+    if sfh in [1,4]:
+        return build_sps_parametric( zcontinuous, compute_vega_mags, **extras )
     else:
         raise Exception
 
@@ -108,6 +109,10 @@ def build_sps_nonparametric(zcontinuous=1, compute_vega_mags=False, **extras):
     sps = FastStepBasis(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_mags)
     return sps
 
+def build_sps_parametric(zcontinuous=1, compute_vega_mags=False, **extras):
+    from prospect.sources import CSPSpecBasis
+    sps = CSPSpecBasis(zcontinuous=zcontinuous, compute_vega_mags=compute_vega_mags)
+    return sps
 
 # -----------------
 # Noise Model
@@ -242,35 +247,14 @@ def build_model_continuity( model_params, nbins, zred, tlims_first=None, tlims_l
 
     return model_params
 
-def build_model_UMtuned_continuity( model_params, nbins, zred, tlims_first=None, tlims_logspace=False,
-                                    **extras ):
-    """
-    Add continuity prior parameters
-    """
-    from prospect.models import priors, transforms
+def build_model_dexp( model_params, prior_tau_log=True, **extras ):
+    from prospect.models import priors
     from prospect.models.templates import TemplateLibrary
-
-    model_params.update( TemplateLibrary["beta"] )
-
-    model_params['nzsfh'] = {'N': nbins+2,
-                             'isfree': True,
-                             'init': np.concatenate([[0.5,8,0.0], np.zeros(nbins-1)]),
-                             'prior': priors_beta.NzSFH(zred_mini=1e-3, zred_maxi=15.0,
-                                                    mass_mini=7.0, mass_maxi=12.5,
-                                                    z_mini=-1.98, z_maxi=0.19,
-                                                    logsfr_ratio_mini=-5.0, logsfr_ratio_maxi=5.0,
-                                                    logsfr_ratio_tscale=0.3, nbins_sfh=nbins,
-                                                    const_phi=True)}
-
-    model_params["logmass"]["init"] = 8.48
-    model_params["zred"]["init"] = zred
-
-    model_params["logsfr_ratios"]["N"] = nbins-1
-    model_params['mass']['N'] = nbins
-
-    model_params['agebins']['N'] = nbins
-    model_params['agebins']['init'] = transforms.zred_to_agebins_pbeta(np.atleast_1d(0.5), np.zeros(nbins))
-
+    model_params.update( TemplateLibrary["parametric_sfh"] )
+    if prior_tau_log:
+        model_params["tau"]["prior"] = priors.LogUniform(mini=0.1, maxi=10)
+    else:
+        model_params["tau"]["prior"] = priors.TopHat(mini=0.1, maxi=10)
 
     return model_params
 
@@ -337,8 +321,10 @@ def build_model( data_dict=None, sfh=3,
             model_params = build_model_dirichlet( model_params, nbins, zred, alphaD=alphaD, **extras )
         elif stdT_mean is not None:
             model_params = build_model_continuity( model_params, nbins, zred,  stdT_mean=stdT_mean, **extras )
-    elif sfh in [0,4]: # parametric model
-        print('Error: parametric model not yet implemented. Exiting...')
+    elif sfh in [1,4]: # parametric model
+        model_params = build_model_dexp( model_params, **extras )
+    else:
+        print('Error: sfh model {} not yet implemented. Exiting...'.format(sfh))
         raise Exception
 
     # Non-parameteric SFH fitting for mass in flexible time bins with a smoothness prior
@@ -438,7 +424,7 @@ def build_model( data_dict=None, sfh=3,
         else:
             from Dragonfly44_SFH.fitting.prospect.models.sedmodel import PolySpecModel_diffspeccal
             model = PolySpecModel_diffspeccal(model_params)
-            # model = sedmodel.PolySpecModel(model_params)
+#            model = sedmodel.PolySpecModel(model_params)
     elif extras["fit_polynomial"]:
         print("Error: Fitting coefficient of spec calibration not implemented")
         sys.exit()

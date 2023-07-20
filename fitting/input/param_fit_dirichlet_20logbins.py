@@ -22,14 +22,14 @@ default_run_params = {
               'tlims_first': [1e-9, 0.03, 0.1, 0.5, 1., 2., 3],
               'tlims_logspace': True,
 
-              'file_data': path_data+"DF44/obs_phot_specKCWI_sigma110.h5",
+              'file_data': path_data+"Dragonfly44/obs_phot_specKCWI_sigma110.h5",
               'path_outfile': path_fits,
 
               'fit_sigma':    False, # whether to fit for the smoothing parameters (False usually)
               'fit_logzsol':  True, # Whether metallicity is a free or fixed parameter
               'fit_mass':  True, # Whether mass is a free or fixed parameter
 
-              'fit_redshift':     False, # Whether redshift is a free or fixed parameter
+              'fit_redshift':     True, # Whether redshift is a free or fixed parameter
 
               'fit_spectra':      True, # Fit spectroscopy?
               'fit_phot':         True, # Fit photometry?
@@ -86,6 +86,8 @@ if __name__=='__main__':
     parser.add_argument('--fit_spectra', type=int, default=default_run_params['fit_spectra'], help='Whether to fit spectra or not')
     parser.add_argument('--fit_phot', type=int, default=default_run_params['fit_phot'], help='Whether to fit photometry or not')
     parser.add_argument('--fit_sigma', type=int, default=default_run_params['fit_sigma'], help='Whether to fit smoothing parameter')
+    parser.add_argument('--fit_redshift', type=int, default=default_run_params['fit_redshift'] )
+    parser.add_argument('--fit_mass', type=int, default=default_run_params['fit_mass'], help='Whether to stellar mass')
 
     parser.add_argument('--wave_range', type=int, nargs="*", default=[0,10000])
     parser.add_argument('--max_snr', type=float, default=1000000, )
@@ -95,7 +97,6 @@ if __name__=='__main__':
     run_params = vars(args)
 
     if not run_params['fit_spectra']:
-        run_params['fit_redshift'] = False
         run_params['fit_sigma'] = False
         run_params['fit_noise_spec'] = False
         run_params['fit_outlier_spec'] = False
