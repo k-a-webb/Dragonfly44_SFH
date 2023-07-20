@@ -49,9 +49,11 @@ def build_model_sps( zred, opt_polynomial=True, fit_duste=False, fit_agn=False, 
 
     if opt_polynomial:
         #model = sedmodel.PolySpecModel(model_params)
-        model = sedmodel.PolySpecModel_v2(model_params)
+        from Dragonfly44_SFH.fitting.prospect.models.sedmodel import PolySpecModel_diffspeccal
+        model = PolySpecModel_diffspeccal(model_params)
     else:
-        model = sedmodel.SpecModel(model_params)
+        from prospect.models.sedmodel import SpecModel
+        model = SpecModel(model_params)
 
     model.params['sigma_smooth'] = 100
     model.params['smoothtype'] = "vel"

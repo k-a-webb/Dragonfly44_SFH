@@ -18,8 +18,8 @@ default_run_params = {
               'sfh': 3,
               'alphaD': 1,
 
-              'nbins': 8,
-              'tlims_first': [1., 2., 3],
+              'nbins': 20,
+              'tlims_first': [1e-9, 0.03, 0.1, 0.5, 1., 2., 3],
               'tlims_logspace': True,
 
               'file_data': path_data+"DF44/obs_phot_specKCWI_sigma110.h5",
@@ -121,7 +121,7 @@ if __name__=='__main__':
 
     obs = build_obs( **run_params )
     model = build_model( **run_params )
-    sps = build_sps_nonparametric(**run_params)
+    sps = build_sps(**run_params)
     noise = build_noise(**run_params)
 
     model_param_text = 'Model params\n'

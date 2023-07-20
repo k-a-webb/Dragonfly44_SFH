@@ -1,3 +1,4 @@
+zobs_DF44 = 0.02142
 
 parameter_labels = dict( dust2=r"$\hat{\tau}_\mathrm{dust,~diffuse}$",
                          Av=r"$A_\mathrm{V}$",

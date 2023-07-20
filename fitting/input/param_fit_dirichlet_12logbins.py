@@ -6,7 +6,7 @@ from prospect import prospect_args
 from prospect.fitting import fit_model
 from prospect.io import write_results as writer
 
-from param_fit_setup import *
+from Dragonfly44_SFH.fitting.input.param_fit_setup import *
 
 # --------------
 # RUN_PARAMS

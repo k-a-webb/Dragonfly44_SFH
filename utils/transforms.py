@@ -279,7 +279,7 @@ def sfrac_to_logsfr_ratios( sfrac, **extras ):
 #################### miscellaneous
 
 def zred_to_age( zred=None, **extras ):
-    from prospect.sources.constants import cosmo
+    from Dragonfly44_SFH.fitting.prospect.sources.constants import cosmo
     return cosmo.age(zred).value
 
 def dust2_to_Av( dust2 ):

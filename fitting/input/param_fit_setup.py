@@ -11,53 +11,9 @@ from prospect.sources.constants import cosmo
 from Dragonfly44_SFH.utils import obs_io
 
 import os
-path_base = os.getcwd().split('Dragonfly44_SFH')[0] + "Dragonfly44_SFH/" # hack, but works
-path_fits = path_base+ "fitting/output/fits/"
-path_data = path_base+ "data/"
-
-# --------------
-# RUN_PARAMS
-# --------------
-
-# https://prospect.readthedocs.io/en/latest/usage.html
-# global_run_params = {
-#               # Obs data parameters
-#               'nbins': 12, # number of time bins of SFH model, spacing to be specified in build_agebins function
-#               'tlims_first': [0.03,0.1,0.5,1.], # fixed edges of time bins
-#
-#               ###########################################
-#               # options for what data to include in the fit
-#               'file_data': '<path>/dragonfly44/data/obs.h5', # hard coded path to data file, see build_data function
-#
-#               'fit_spectra':      True, # Fit spectroscopy?
-#               'wave_range': [3000,10000], # rest-frame wavelength of spectrum to be fit, masked otherwise
-#               'max_snr_spec': 10000000, # maxinimum S/N of spectroscopy
-#               'max_snr_phot': 20, # maxinimum S/N of photometry
-#               'npoly': 3, # Degress of Chebyshev polynomial for specphot calibratino
-#
-#               'fit_phot':         True, # Fit photometry?
-#
-#               ###########################################
-#               # options for what include in the SED model
-#               'fit_redshift':     True, # Whether redshift is a free or fixed parameter
-#               'fit_logzsol':  True, # Whether metallicity is a free or fixed parameter
-#               'fit_mass':  True, # Whether mass is a free or fixed parameter
-#
-#               'fit_agn':     False, # fit agn emission
-#               'fit_duste':   True, # fit dust emission
-#               'fit_neb':     False, # fit nebular emission
-#
-#               'fit_outlier_spec': True, # fit for outliers in spectroscopy
-#               'fit_noise_spec':   True, # Jitter parameter for spectroscopy
-#
-#               'fit_sigma':    True, # whether to fit for the smoothing parameters (False usually)
-#               # either opt_polynomial or fit_polynomial, not both (if neighter, no spec-phot calibration)
-#               'opt_polynomial':   True, # whether to optimize a polynomial ratio between F_true and F_obs
-#               'fit_polynomial':   False, # whether to fit for a polynomial ratio between F_true and F_obs (ie includes prior)
-#               # spectrum has already been rescaled
-#               'rescale_spectrum': False, # If True, rescale the spectrum to have an average of 1 before doing anything.
-#
-#               }
+path_base = os.getcwd().split('Dragonfly44_SFH')[0] # gross, but works
+path_fits = path_base+ "Dragonfly44_SFH/fitting/output/fits/"
+path_data = path_base+ "Dragonfly44_SFH/data/"
 
 
 # OBS
@@ -73,6 +29,8 @@ def build_obs( data_dict=None,
     if data_dict is None: data_dict = obs_io.read_file_data( file_data=file_data, **extras )
 
     obs = {} # Observation dictionary
+    obs['Redshift'] = data_dict['Redshift']
+
     for key in ['phot_wave','filters','maggies','maggies_unc','spectrum','unc','mask','phot_mask','wavelength']:
         obs[key] = None
 
@@ -366,34 +324,13 @@ def build_model( data_dict=None, sfh=3,
     """Construct a model.  This method defines a number of parameter
     specification dictionaries and uses them to initialize a
     `models.sedmodel.SedModel` object."""
-
-    if data_dict is None: data_dict = obs_io.read_file_data( **extras )
-    zred = data_dict['Redshift']
-
     from prospect.models.templates import TemplateLibrary
     from prospect.models import priors, sedmodel, transforms
 
-    model_params = TemplateLibrary["dirichlet_sfh"]
+    model_params = {}
 
-    # Non-parameteric SFH fitting for mass in flexible time bins with a smoothness prior
-    model_params['imf_type'] = {"N": 1, "isfree": False, "init": 1}        # Chabrier
-
-    model_params["zred"] = {"N": 1,
-                            "init": zred,
-                            "isfree": extras["fit_redshift"],
-                            "prior": priors.TopHat(mini=np.max([0, zred-0.01]), maxi=zred+0.01),
-                            "units": "spectroscopic redshift",
-                            }
-
-
-    model_params["logzsol"] = {"N": 1,
-                                   "init": -1.26,
-                                   "isfree": extras['fit_logzsol'],
-                                   "units": "log Z/Zsol",
-                                   "prior": priors.TopHat(mini=-2, maxi=0.19),
-                                  }
-
-    model_params = build_model_dust( model_params, dust_type, **extras )
+    if data_dict is None: data_dict = obs_io.read_file_data( **extras )
+    zred = data_dict['Redshift']
 
     if sfh==3: # nonparametric model
         if alphaD is not None:
@@ -403,6 +340,26 @@ def build_model( data_dict=None, sfh=3,
     elif sfh in [0,4]: # parametric model
         print('Error: parametric model not yet implemented. Exiting...')
         raise Exception
+
+    # Non-parameteric SFH fitting for mass in flexible time bins with a smoothness prior
+    model_params['imf_type']['init'] = 1 # Chabrier
+
+    model_params["zred"] = {"N": 1,
+                            "init": zred,
+                            "isfree": extras["fit_redshift"],
+#                            "prior": priors.TopHat(mini=np.max([0, zred-0.01]), maxi=zred+0.01),
+                            "prior": priors.TopHat(mini=0, maxi=10),
+                            "units": "spectroscopic redshift",
+                            }
+
+    model_params["logzsol"] = {"N": 1,
+                                   "init": -1.26,
+                                   "isfree": extras['fit_logzsol'],
+                                   "units": "log Z/Zsol",
+                                   "prior": priors.TopHat(mini=-2, maxi=0.19),
+                                  }
+
+    model_params = build_model_dust( model_params, dust_type, **extras )
 
     if extras["fit_sigma"]: # whether to smooth the model spectrum with a variable resolution (otherwise fixed)
         model_params.update(TemplateLibrary["spectral_smoothing"])
@@ -479,7 +436,9 @@ def build_model( data_dict=None, sfh=3,
             from Dragonfly44_SFH.fitting.prospect.models.sedmodel import PolySpecModel_dirichlet
             model = PolySpecModel_dirichlet(model_params)
         else:
-            model = sedmodel.PolySpecModel(model_params)
+            from Dragonfly44_SFH.fitting.prospect.models.sedmodel import PolySpecModel_diffspeccal
+            model = PolySpecModel_diffspeccal(model_params)
+            # model = sedmodel.PolySpecModel(model_params)
     elif extras["fit_polynomial"]:
         print("Error: Fitting coefficient of spec calibration not implemented")
         sys.exit()

@@ -16,10 +16,10 @@ from Dragonfly44_SFH.fitting.input.param_fit_setup import *
 default_run_params = {
               # Obs data parameters
               'sfh': 3,
-              'alphaD': 1,
+              'stdT_mean': 0,
 
-              'nbins': 8,
-              'tlims_first': [1., 2., 3],
+              'nbins': 12,
+              'tlims_first': [1e-9,0.03, 0.1, 0.5, 1., 2., 3],
               'tlims_logspace': True,
 
               'file_data': path_data+"DF44/obs_phot_specKCWI_sigma110.h5",
@@ -29,7 +29,7 @@ default_run_params = {
               'fit_logzsol':  True, # Whether metallicity is a free or fixed parameter
               'fit_mass':  True, # Whether mass is a free or fixed parameter
 
-              'fit_redshift':     False, # Whether redshift is a free or fixed parameter
+              'fit_redshift':     True, # Whether redshift is a free or fixed parameter
 
               'fit_spectra':      True, # Fit spectroscopy?
               'fit_phot':         True, # Fit photometry?
@@ -81,7 +81,7 @@ if __name__=='__main__':
 
     # - Add custom arguments -
     parser.add_argument('--file_data', type=str, default=default_run_params['file_data'], help='Name of file with spectral information')
-    parser.add_argument('--alphaD', type=float, default=default_run_params['alphaD'], help='Dirichlet SFH prior parameter')
+    parser.add_argument('--stdT_mean', type=float, default=default_run_params['stdT_mean'], help='Continuity SFH prior parameter')
 
     parser.add_argument('--fit_spectra', type=int, default=default_run_params['fit_spectra'], help='Whether to fit spectra or not')
     parser.add_argument('--fit_phot', type=int, default=default_run_params['fit_phot'], help='Whether to fit photometry or not')
@@ -95,7 +95,6 @@ if __name__=='__main__':
     run_params = vars(args)
 
     if not run_params['fit_spectra']:
-        run_params['fit_redshift'] = False
         run_params['fit_sigma'] = False
         run_params['fit_noise_spec'] = False
         run_params['fit_outlier_spec'] = False

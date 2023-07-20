@@ -16,11 +16,11 @@ from Dragonfly44_SFH.fitting.input.param_fit_setup import *
 default_run_params = {
               # Obs data parameters
               'sfh': 3,
-              'alphaD': 1,
+              'isbeta': True,
 
-              'nbins': 8,
-              'tlims_first': [1., 2., 3],
-              'tlims_logspace': True,
+              'nbins': 12,
+              #'tlims_first': [1e-9,0.03, 0.1, 0.5, 1., 2., 3],
+              #'tlims_logspace': True,
 
               'file_data': path_data+"DF44/obs_phot_specKCWI_sigma110.h5",
               'path_outfile': path_fits,
@@ -81,7 +81,6 @@ if __name__=='__main__':
 
     # - Add custom arguments -
     parser.add_argument('--file_data', type=str, default=default_run_params['file_data'], help='Name of file with spectral information')
-    parser.add_argument('--alphaD', type=float, default=default_run_params['alphaD'], help='Dirichlet SFH prior parameter')
 
     parser.add_argument('--fit_spectra', type=int, default=default_run_params['fit_spectra'], help='Whether to fit spectra or not')
     parser.add_argument('--fit_phot', type=int, default=default_run_params['fit_phot'], help='Whether to fit photometry or not')

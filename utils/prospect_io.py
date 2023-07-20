@@ -1,7 +1,7 @@
 import numpy as np
 import h5py
 import prospect.io.read_results as pread
-from prospect.sources.constants import cosmo
+from Dragonfly44_SFH.fitting.prospect.sources.constants import cosmo
 import astropy.units as u
 import os
 from copy import deepcopy
@@ -37,8 +37,6 @@ def read_input(file_data=None, **extras):
     return ddict
 
 def read_results( result_file, more_groups=["draws"] , manual_agebins=None, sfh=None, **extras ):
-    # import prospect.io.read_results as pread
-    # from prospect_io import read_results
 
     result = get_res( result_file, more_groups=more_groups, **extras )
     try:
@@ -271,9 +269,6 @@ def get_model(result, file_data=None, file_data_path=None, param_file_path=None,
     elif file_data_path is not None:
         _, file_data = os.path.split( result['run_params']['file_data'] )
         result['run_params']['file_data'] = file_data_path+file_data
-
-    # if 'fit_mass' not in result['run_params'].keys():
-    #     result['run_params']['fit_mass'] = True
 
     param_file = result['run_params'].get('param_file', '')
     paramfile_text = result.get("paramfile_text", '')

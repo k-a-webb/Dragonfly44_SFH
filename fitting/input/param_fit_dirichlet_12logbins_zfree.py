@@ -18,8 +18,8 @@ default_run_params = {
               'sfh': 3,
               'alphaD': 1,
 
-              'nbins': 8,
-              'tlims_first': [1., 2., 3],
+              'nbins': 12,
+              'tlims_first': [1e-9, 0.03, 0.1, 0.5, 1., 2., 3],
               'tlims_logspace': True,
 
               'file_data': path_data+"DF44/obs_phot_specKCWI_sigma110.h5",
@@ -29,7 +29,7 @@ default_run_params = {
               'fit_logzsol':  True, # Whether metallicity is a free or fixed parameter
               'fit_mass':  True, # Whether mass is a free or fixed parameter
 
-              'fit_redshift':     False, # Whether redshift is a free or fixed parameter
+              'fit_redshift':     True, # Whether redshift is a free or fixed parameter
 
               'fit_spectra':      True, # Fit spectroscopy?
               'fit_phot':         True, # Fit photometry?
@@ -95,7 +95,6 @@ if __name__=='__main__':
     run_params = vars(args)
 
     if not run_params['fit_spectra']:
-        run_params['fit_redshift'] = False
         run_params['fit_sigma'] = False
         run_params['fit_noise_spec'] = False
         run_params['fit_outlier_spec'] = False
@@ -121,7 +120,7 @@ if __name__=='__main__':
 
     obs = build_obs( **run_params )
     model = build_model( **run_params )
-    sps = build_sps_nonparametric(**run_params)
+    sps = build_sps(**run_params)
     noise = build_noise(**run_params)
 
     model_param_text = 'Model params\n'

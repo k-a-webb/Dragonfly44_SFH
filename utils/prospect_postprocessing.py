@@ -236,7 +236,7 @@ def add_Av_to_chain( result ):
     try:
         x = chain_to_Av( **result )
     except Exception as e:
-        print(e)
+        print('Error: in add_Av_to_chain', e)
         x = np.full_like( result['chain'][...,0], np.nan )
     result = add_to_chain( result, x, 'Av' )
 

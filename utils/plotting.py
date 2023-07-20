@@ -725,11 +725,11 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
 
 
-def plot_cmf( sfh=3, **extras ):
+def plot_cmf( ax, sfh=3, **extras ):
     if sfh==3:
-        ax = plot_cmf_nonparametric( **extras )
+        ax = plot_cmf_nonparametric( ax,  **extras )
     elif sfh in [1,4]:
-        ax = plot_cmf_parametric( **extras )
+        ax = plot_cmf_parametric(  ax, **extras )
     return ax
 
 def plot_cmf_parametric(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
