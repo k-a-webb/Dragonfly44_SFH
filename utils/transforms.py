@@ -86,13 +86,12 @@ def chain_to_sfr( chain, theta_index, agebins=None, norm_by_mass=True,
         tages = chain_to_param( chain, theta_index, 'tage')
         taus = chain_to_param( chain, theta_index, 'tau')
         masses = chain_to_param( chain, theta_index, 'mass')
+        if norm_by_mass:
+            masses = np.ones_like(masses)
 
         sfrs = []
         for tage,tau,mass in zip( tages, taus, masses ):
-            sfr = parametric_sfr( tage=tage, \
-                                   times=times, \
-                                   **dict( tau=tau, mass=mass )
-                                 )
+            sfr = parametric_sfr( tage=tage, tau=tau, mass=mass, times=times )
             sfrs.append( sfr )
         sfrs = np.vstack( sfrs )
 

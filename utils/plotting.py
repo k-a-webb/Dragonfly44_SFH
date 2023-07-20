@@ -632,6 +632,9 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
     from Dragonfly44_SFH.utils.misc_utils import weighted_quantile
     from Dragonfly44_SFH.utils.transforms import chain_to_sfr
 
+    if sfrs_post is None:
+        sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, times=times, **result )
+
     if sfh==3:
         agebins = np.copy( result['agebins'] )
         agebins_Gyr = np.power(10, agebins-9)
@@ -639,8 +642,6 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
         x = np.unique( agebins_Gyr )
         mx = x[:-1]+np.diff(x)/2. # midpoint of bins
-
-        sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, **result )
 
         if show_bestfit:
             ibest = np.argmax( result["lnprobability"] )
@@ -672,20 +673,6 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
     else:
         assert times is not None, "Error: must provide time vector to plot SFR for sfh {}".format(sfh)
         x = times
-
-        if sfrs_post is None:
-            from prospect.plotting.sfh import params_to_sfh
-            from Dragonfly44_SFH.utils.transforms import chain_to_param
-
-            masses = chain_to_param( param='mass', **result)[:,0]
-            if norm_by_mass: masses = np.ones_like(masses)
-            _, sfrs_post, _ = params_to_sfh( dict( tau=chain_to_param( param='tau', **result)[:,0],
-                                                 tage=chain_to_param( param='tage', **result)[:,0],
-                                                 sfh=sfh,
-                                                 mass=masses,
-                                               ),
-                                            time=times )
-
 
         if show_bestfit:
             ibest = np.argmax( result["lnprobability"] )
@@ -727,13 +714,13 @@ def plot_sfh(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
 
 def plot_cmf( ax, sfh=3, **extras ):
     if sfh==3:
-        ax = plot_cmf_nonparametric( ax,  **extras )
+        ax = plot_cmf_nonparametric( ax, **extras )
     elif sfh in [1,4]:
         ax = plot_cmf_parametric(  ax, **extras )
     return ax
 
 def plot_cmf_parametric(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
-                         sfh=4, times=None, cmfs_post=None, thin=10,
+                         sfh=4, times=None, sfrs_post=None, thin=10,
                          posts_params={'color':'c', 'lw':0},
                          priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
                          bestfit_params={'marker':'X', 'edgecolor':'k', 'facecolor':'None', 's':80, 'lw':0.9},
@@ -741,25 +728,18 @@ def plot_cmf_parametric(ax, result, prior_draws=None, show_bestfit=True, show_pr
                          xscale='log', vwidths=0.2,
                          **extras,
                         ):
+    from prospect.plotting.sfh import sfh_to_cmf
     assert times is not None, "Error: must provide time vector to plot SFR for sfh {}".format(sfh)
 
-    if cmfs_post is None:
-        from prospect.plotting.sfh import params_to_sfh
-        from Dragonfly44_SFH.utils.transforms import chain_to_param
-        from prospect.plotting.sfh import sfh_to_cmf
+    times_like_agebins = np.log10(times*1e9)
+    times_like_agebins[0] = 1e-9
+    times_like_agebins = np.array([ times_like_agebins[:-1], times_like_agebins[1:] ]).T
 
-        masses = chain_to_param( param='mass', **result)[:,0]
-        _, sfrs_post, cmfs_post = params_to_sfh( dict( tau=chain_to_param( param='tau', **result)[:,0],
-                                             tage=chain_to_param( param='tage', **result)[:,0],
-                                             sfh=sfh,
-                                             mass=masses,
-                                           ),
-                                        time=times )
+    if sfrs_post is None:
+        from Dragonfly44_SFH.utils.transforms import chain_to_sfr
+        sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, times=times, **result )
 
-        times_like_agebins = np.log10(times*1e9)
-        times_like_agebins[0] = 1e-9
-        times_like_agebins = np.array([ times_like_agebins[:-1], times_like_agebins[1:] ]).T
-        x, cmfs_post = sfh_to_cmf( sfrs_post[:,:-1], times_like_agebins )
+    x, cmfs_post = sfh_to_cmf( sfrs_post[:,:-1], times_like_agebins )
 
     if xscale=='log': x = np.log10(x)
 
@@ -804,7 +784,7 @@ def plot_cmf_parametric(ax, result, prior_draws=None, show_bestfit=True, show_pr
     return ax
 
 def plot_cmf_nonparametric(ax, result, prior_draws=None, show_bestfit=True, show_priors=True,
-                             style='violin',
+                             style='violin', sfrs_post=None,
                              posts_params={'color':'c', 'lw':0},
                              priors_params={'facecolor':'None', 'edgecolor':'goldenrod', 'hatch':'//', 'lw':0 },
                              bestfit_params={'marker':'X', 'edgecolor':'k', 'facecolor':'None', 's':80, 'lw':0.9},
@@ -819,9 +799,9 @@ def plot_cmf_nonparametric(ax, result, prior_draws=None, show_bestfit=True, show
     agebins_Gyr = np.power(10, agebins-9)
     xs = np.unique( agebins_Gyr )
 
-    # get posteriors for the sfr
-    from Dragonfly44_SFH.utils.transforms import chain_to_sfr
-    sfrs_post = chain_to_sfr( norm_by_mass=True, **result )
+    if sfrs_post is None:
+        from Dragonfly44_SFH.utils.transforms import chain_to_sfr
+        sfrs_post = chain_to_sfr( norm_by_mass=norm_by_mass, times=times, **result )
 
     # covert to cmf
     from prospect.plotting.sfh import sfh_to_cmf
